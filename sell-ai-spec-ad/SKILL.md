@@ -15,7 +15,11 @@ Two hard guardrails, both about the creator staying in control:
 
 ## Before you start
 
-Check the Peekroom tools are available (`create_room`, `upload_asset`, `set_watermark`, `set_price`, `get_room_link`, `publish_room`). If they aren't, tell the creator to connect Peekroom first: in Claude, Settings → Connectors → Add custom connector, URL `https://app.peekroom.art/mcp`, then sign in on the Peekroom page that opens. Stop there until it's connected.
+Check the Peekroom tools are available: `create_room`, `upload_asset`, `confirm_upload`, `set_watermark`, `list_rooms`, `get_room_link`, `publish_room` (also `set_cover`, `rename_asset`, `set_price` for changes). If they aren't, tell the creator to connect Peekroom first and stop there until it's connected:
+
+- Claude (web or desktop): Settings → Connectors → Add custom connector, URL `https://app.peekroom.art/mcp`, then sign in on the Peekroom page that opens.
+- Claude Code: `claude mcp add --transport http peekroom https://app.peekroom.art/mcp`, then `/mcp` to sign in.
+- ChatGPT, Cursor, Gemini and scripts: https://www.peekroom.art/agents
 
 ## Step 1. Collect the brief
 
@@ -23,54 +27,52 @@ Ask only for what's missing, in one message. You need:
 
 | Field | Notes |
 |---|---|
-| Brand name | As the brand writes it. Used as the room name the brand sees. |
+| Brand name | As the brand writes it. The brand sees it on the room. |
 | Room title | Short, e.g. "Serum launch film". Suggest one from the product if they don't care. |
-| Files | Public download links (`https://…`) to each video/photo. Videos MP4/MOV/WebM up to 2 GB and 10 min; photos JPEG/PNG/WebP/HEIC up to 100 MB. |
+| Files | Local files or public download links (`https://…`). Videos MP4/MOV/WebM up to 2 GB and 10 min; photos JPEG/PNG/WebP/HEIC up to 100 MB. |
 | File names | What the brand sees, e.g. "Hero 9:16", "Cut-down 1:1". Default to the shape and length. |
 | Price | One price in euros for the whole pack. Optional higher crossed-out list price. |
-| Usage | Organic only, organic + paid, or full buyout. Goes in the room description. |
-| Watermark | Studio name as text (any plan), their logo URL (Pro/Studio), or the Peekroom mark. Default: their studio name, tiled. |
+| Usage | Organic only, organic + paid, or full buyout. Goes in the room description, which the brand sees. |
+| Watermark | The room starts with the studio name as text, tiled. Other options: a logo URL (Pro/Studio) or the Peekroom mark. |
 | Language | The language the brand reads: en, pt or es. Default en. |
 | Contact | Name of the person at the brand, if they have one. Only for the message. |
 
-Files attached directly to the chat can't be passed as links. Ask for a public link (most AI video tools give a download URL for each render; a shared Drive/Dropbox link set to "anyone with the link" also works if it downloads the file directly). If they only have local files, create the room anyway and tell them to drag the files into the room in the Peekroom web editor, then continue.
-
 Don't suggest a price. If they ask, help them reason from their costs, what the film replaces for the brand, and the usage they're granting, and let them pick the number.
 
-Done when every required field (brand, files or the web-upload fallback, price) has a value the creator gave or accepted.
+Done when every required field (brand, files, price) has a value the creator gave or accepted.
 
 ## Step 2. Build the draft room
 
-1. `create_room` with `brand_name`, `title`, `locale`, `price_eur` (and `list_price_eur` if given), and a `description` that lists the files and the usage terms in two or three plain lines.
-2. `upload_asset` once per file with `room_id`, `source_url` and `label`.
-3. `set_watermark` with the creator's choice. Default: `mark: "text"`, `text: <studio name>`, `pattern: "tiled"`. If they want something cleaner, offer `diagonal` or `frame` and mention that tiled is the hardest to crop out.
-4. Optional: if the creator names a frame for the cover, `set_cover` with `asset_id`, `time_seconds` and `room_cover: true` once the video is READY.
-5. `list_rooms` with `include_files: true` to confirm every file reached READY or is still processing. Report any failed file with the reason the tool gives.
+1. `create_room` with `brand_name`, `title`, `locale`, `price_eur` (and `list_price_eur` if given), and a `description` that lists the files and the usage terms in two or three plain lines. Keep the `room_id`.
+2. Add each file with `upload_asset` (`room_id`, `label`, and one of the two ways below).
+   - **Public link:** pass `source_url`. The server downloads the file. Nothing else to do.
+   - **Local file:** pass `filename`, `content_type` (e.g. `video/mp4`, `image/jpeg`) and `bytes` (the exact size). The tool returns an upload URL valid for one hour and a ready `curl` command. If you can run shell commands (Claude Code, a terminal agent), run that `curl` from the folder that holds the file, then call `confirm_upload` with the `asset_id`. If you can't (a file attached to a chat can't be sent on), give the creator the `curl` to run, or tell them to drag the file into the room in the Peekroom editor (the `edit_url` from `create_room`), and continue.
+   - If `confirm_upload` says the file hasn't arrived, the `curl` didn't finish: run it again, then confirm again.
+3. The watermark is already the studio name, tiled. Call `set_watermark` only if the creator wants something else: another `text`, `mark: "logo"` with `logo_url` (Pro/Studio), or `mark: "peekroom"`, and a `pattern` (`tiled`, `diagonal`, `frame`, `line`, `center`, `corner`). Mention that tiled is the hardest to crop out. Previews already made are re-rendered on their own.
+4. `list_rooms` with `include_files: true` to check each file. Previews usually take seconds to a minute. While a file is PROCESSING, wait and check again; report any FAILED file with the reason the tool gives.
+5. Optional: if the creator names a frame for the cover, `set_cover` with `asset_id`, `time_seconds` and `room_cover: true`. This only works once the video is READY; if the tool says it is still processing, wait and retry.
 
 If a tool returns a plan limit or a Stripe message, relay it in plain words and carry on with what still works. Drafts can be built without Stripe; only publishing needs it.
 
-Done when the room exists as DRAFT with every file uploaded (or the creator knows which to add on the web), the watermark set and the price set.
+Done when the room exists as DRAFT with every file READY (or the creator knows which ones to add in the editor), and the price set.
 
-## Step 3. Show the summary and wait
+## Step 3. Show the summary and the message, then wait
 
-Call `get_room_link` and show the creator:
+Call `get_room_link`. The link and access code it returns stay the same after publishing. Show the creator:
 
 - Room title, brand, status (Draft), price and usage.
 - Each file with its name and status.
 - Watermark choice.
-- Link and access code.
-- Any warning the tool returned (Stripe not connected, plan limits).
+- Link and access code, and the editor link to see the room as the brand will.
+- Any warning the tools returned. If Stripe isn't connected, say: "To publish, connect Stripe first: Payments in Peekroom (https://app.peekroom.art/pagamentos). Your draft stays saved." On the Free plan, add that a draft nobody edits or publishes for 7 days loses its files.
+- The message to the brand (below), ready to paste once the room is published.
 - One line: "The brand can't open this until it's published. Reply **publish** when you're happy, or tell me what to change."
 
-Make any changes they ask for with the same tools, then show the summary again.
+Make any changes they ask for with the same tools (`rename_asset`, `set_price`, `set_watermark`, `set_cover`), then show the summary again.
 
-## Step 4. Publish on the creator's word
+### The message to the brand
 
-Only after an explicit yes: `publish_room` with `room_id`. If it fails because Stripe isn't connected, tell them to connect Stripe in Peekroom (Payments in the studio menu, app.peekroom.art) and say "publish" again. Relay any `archived_to_make_room` note.
-
-## Step 5. Hand over the message
-
-Write the message to the brand in the room's language, ready to paste, using the link and code from `publish_room`. Keep it under 120 words:
+Write it in the room's language, using the link and code. Keep it under 120 words:
 
 ```
 Subject: A [product] film I made for [Brand]
@@ -90,6 +92,16 @@ The clean files are €[price] for [files], [usage]. You can pay in the room and
 
 Fill only what the creator told you. Leave a visible `[bracket]` for anything you don't know; never invent a reason, a past client or a result.
 
-Then add two short tips: send it to a named person using contact details the brand publishes, and follow up once after about a week, adding something new (a new cut or format) to the same room. The room shows how many times it was viewed, which tells them whether to resend or to follow up.
+## Step 4. Publish on the creator's word
+
+Only after an explicit yes: `publish_room` with `room_id`. It needs Stripe connected, a price and at least one READY file.
+
+- If it says Stripe isn't connected: nothing was lost. Tell them to open Payments in Peekroom (https://app.peekroom.art/pagamentos), connect Stripe, and say "publish" again. Don't retry before they confirm.
+- If it says to upload a file and wait until it's ready: check `list_rooms` and retry when a file is READY.
+- Relay any `archived_to_make_room` note (on the Free plan, publishing past the active-room limit archives the oldest room in 7 days).
+
+## Step 5. Hand over
+
+Once published, repeat the link, the access code and the message (updated if anything changed). Then add two short tips: send it to a named person using contact details the brand publishes, and follow up once after about a week, adding something new (a new cut or format) to the same room. The room shows how many times it was viewed, which tells them whether to resend or to follow up.
 
 Done when the creator has the published link, the access code and the message, and you've said plainly that nothing has been sent to the brand.

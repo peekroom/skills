@@ -1,0 +1,19 @@
+{
+  "name": "peekroom",
+  "description": "Peekroom skills: sell AI spec ads to brands from private, watermarked rooms.",
+  "owner": { "name": "Peekroom", "email": "hello@peekroom.art", "url": "https://www.peekroom.art" },
+  "plugins": [
+    {
+      "name": "sell-ai-spec-ad",
+      "source": "./",
+      "description": "Turn a finished AI spec ad into a private, watermarked Peekroom room with a price, and draft the message to the brand. Includes the Peekroom connector.",
+      "homepage": "https://www.peekroom.art/sell-your-ai-spec-ad",
+      "repository": "https://github.com/peekroom/skills",
+      "license": "MIT",
+      "skills": ["./sell-ai-spec-ad"],
+      "mcpServers": {
+        "peekroom": { "type": "http", "url": "https://app.peekroom.art/mcp" }
+      }
+    }
+  ]
+}
