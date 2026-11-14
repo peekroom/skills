@@ -15,7 +15,7 @@ Two hard guardrails, both about the creator staying in control:
 
 ## Before you start
 
-Check the Peekroom tools are available: `create_room`, `upload_asset`, `confirm_upload`, `set_watermark`, `list_rooms`, `get_room_link`, `publish_room` (also `set_cover`, `rename_asset`, `set_price` for changes). If they aren't, tell the creator to connect Peekroom first and stop there until it's connected:
+Check the Peekroom tools are available: `create_room`, `upload_asset`, `confirm_upload`, `set_watermark`, `list_rooms`, `get_room_link`, `publish_room`, `reorder_assets` (also `set_cover`, `rename_asset`, `set_price`, `update_room`, `replace_asset`, `remove_asset` for changes). If they aren't, tell the creator to connect Peekroom first and stop there until it's connected:
 
 - Claude (web or desktop): Settings → Connectors → Add custom connector, URL `https://app.peekroom.art/mcp`, then sign in on the Peekroom page that opens.
 - Claude Code: `claude mcp add --transport http peekroom https://app.peekroom.art/mcp`, then `/mcp` to sign in.
@@ -49,8 +49,9 @@ Done when every required field (brand, files, price) has a value the creator gav
    - **Local file:** pass `filename`, `content_type` (e.g. `video/mp4`, `image/jpeg`) and `bytes` (the exact size). The tool returns an upload URL valid for one hour and a ready `curl` command. If you can run shell commands (Claude Code, a terminal agent), run that `curl` from the folder that holds the file, then call `confirm_upload` with the `asset_id`. If you can't (a file attached to a chat can't be sent on), give the creator the `curl` to run, or tell them to drag the file into the room in the Peekroom editor (the `edit_url` from `create_room`), and continue.
    - If `confirm_upload` says the file hasn't arrived, the `curl` didn't finish: run it again, then confirm again.
 3. The watermark is already the studio name, tiled. Call `set_watermark` only if the creator wants something else: another `text`, `mark: "logo"` with `logo_url` (Pro/Studio), or `mark: "peekroom"`, and a `pattern` (`tiled`, `diagonal`, `frame`, `line`, `center`, `corner`). Mention that tiled is the hardest to crop out. Previews already made are re-rendered on their own.
-4. `list_rooms` with `include_files: true` to check each file. Previews usually take seconds to a minute. While a file is PROCESSING, wait and check again; report any FAILED file with the reason the tool gives.
-5. Optional: if the creator names a frame for the cover, `set_cover` with `asset_id`, `time_seconds` and `room_cover: true`. This only works once the video is READY; if the tool says it is still processing, wait and retry.
+4. `list_rooms` with `include_files: true` to check each file and its `position`. Previews usually take seconds to a minute. While a file is PROCESSING, wait and check again; report any FAILED file with the reason the tool gives.
+5. Put the film first. The brand starts the room with file 1, and files land in the order they were uploaded. If the main film isn't at position 1, call `reorder_assets` with `room_id`, the film's `asset_id` and `position: 1` (or `asset_ids` with every file in the order the creator wants). Reordering never changes the room cover.
+6. Optional: if the creator names a frame for the cover, `set_cover` with `asset_id`, `time_seconds` and `room_cover: true` (or `image_url` for their own picture). This only works once the video is READY; if the tool says it is still processing, wait and retry.
 
 If a tool returns a plan limit or a Stripe message, relay it in plain words and carry on with what still works. Drafts can be built without Stripe; only publishing needs it.
 
@@ -68,7 +69,7 @@ Call `get_room_link`. The link and access code it returns stay the same after pu
 - The message to the brand (below), ready to paste once the room is published.
 - One line: "The brand can't open this until it's published. Reply **publish** when you're happy, or tell me what to change."
 
-Make any changes they ask for with the same tools (`rename_asset`, `set_price`, `set_watermark`, `set_cover`), then show the summary again.
+Make any changes they ask for with the same tools (`rename_asset`, `reorder_assets`, `set_price`, `set_watermark`, `set_cover`, `update_room` for the title, brand name, description or language), then show the summary again. To swap a file for a new version, upload it with `upload_asset` and call `replace_asset` (old `asset_id`, `new_asset_id`). To drop a file, `remove_asset`. Both delete a file for good, so confirm with the creator first.
 
 ### The message to the brand
 
@@ -102,6 +103,6 @@ Only after an explicit yes: `publish_room` with `room_id`. It needs Stripe conne
 
 ## Step 5. Hand over
 
-Once published, repeat the link, the access code and the message (updated if anything changed). Then add two short tips: send it to a named person using contact details the brand publishes, and follow up once after about a week, adding something new (a new cut or format) to the same room. The room shows how many times it was viewed, which tells them whether to resend or to follow up.
+Once published, repeat the link, the access code and the message (updated if anything changed). Then add two short tips: send it to a named person using contact details the brand publishes, and follow up once after about a week, adding something new (a new cut or format) to the same room. The room shows how many times the brand opened it (`brand_views` in `list_rooms`), which tells them whether to resend or to follow up.
 
 Done when the creator has the published link, the access code and the message, and you've said plainly that nothing has been sent to the brand.
